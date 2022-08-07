@@ -1,7 +1,7 @@
 /*Task A                                          Task B
   Print new messages from Q2                      Update local variable with yyy.
   Read serial ip from user.                       Blink led with yyy delay.
-  Echo back to serial terminal.                   For every 100 times of blink, send "Century !! " message to Q2.
+  Echo back to serial terminal.                   For every 10 times of blink, send "Great Run" message to Q2.
   If "delay yyy", send yyy to Q1.              
 
 */
@@ -16,6 +16,7 @@
 #include <string.h>
 
 
+
 #if CONFIG_FREERTOS_UNICORE
   static const BaseType_t app_cpu = 0;
 #else 
@@ -24,42 +25,40 @@
 
 
 static TaskHandle_t hUserInterface = NULL;
-static TaskHandle_t hLedInterface = NULL;
+static TaskHandle_t hLedInterface  = NULL;
 
 
-static uint8_t length_queue1 = 5;
-static uint8_t length_queue2 = 1;
+static uint8_t length_delay_queue   = 5;
+static uint8_t length_message_queue = 1; 
 
 
-static QueueHandle_t queue1;
-static QueueHandle_t queue2;
-
+static QueueHandle_t delay_queue;
+static QueueHandle_t message_queue;
 
 int counter;
 
 
 void userInterface (void* parameter){
-  char msg[10];
-
+  char msg[20];
 
   while(1){
-    //Serial.println("sub-task 1 ----> print new messages from Q2");
-    Serial.println("Task 1");
-    if ((xQueueReceive(queue2, msg, 0))==pdTRUE){
-      Serial.print(*(msg));
-      for (counter = 1; counter<9; counter++){
-        xQueueReceive(queue2,(msg+counter),0);
-        Serial.print(*(msg+counter));
-      }
-      Serial.println();
-    }
-
-       
+      
     //Serial.println("sub-task 2 ----> Read serial input from user and echo back to serial terminal");
     char endChar=0, user_message[50];
     int nChar, totalLen, pos, lastPos=0;
 
     while (endChar != 13){
+
+      if ((xQueueReceive(message_queue, msg, 0))==true){
+        xQueueReceive(message_queue, msg, 0);
+        Serial.print(*(msg));
+        for (counter = 1; counter<strlen("Great Run!!"); counter++){
+          xQueueReceive(message_queue,(msg+counter),0);
+          Serial.print(*(msg+counter));
+        }
+        Serial.println();
+      }
+
       nChar = Serial.available();
       if (nChar > 0){
         totalLen += nChar;
@@ -78,12 +77,9 @@ void userInterface (void* parameter){
       }
     }
 
-
-
-    //Serial.println("sub-task 3 -----> if delay xxx, send xxx to Q1");
     char required_message[]="delay ";
     int check_length = strlen(required_message);
-    int x=0;
+    int x;
     bool match = false;
 
     for (pos=0; pos <check_length; pos++){
@@ -92,51 +88,47 @@ void userInterface (void* parameter){
       }
       
       else{
-        // Serial.print(pos);
-        // Serial.println("Here");
         match = false;
         pos = check_length;
       }
     }
 
-    if (match){
-      //Serial.println("Here");      
+    if (match){  
+      x = 0;    
       for (pos = check_length; pos < (check_length + strlen("xxx")); pos ++ ){
         x = (10*x) +(user_message[pos] - 48);
       }
-      //Serial.println(x);
-      xQueueSend(queue1,&x, 0);
+      xQueueSend(delay_queue,&x, 0);
     }
-    //vTaskDelay(1/portTICK_PERIOD_MS);
   }
 }
 
 
 void ledInterface(void* parameter){
   
-  char message[]="Decade!!";
-  int blink = 1;
-  int delay_updated, delay_ = 0;
+  int delay_updated, delay_ = 500;
+  int blink;
   
   //Update local variable with xxx and Blink led with xxx delay
   while (1){
-    //Serial.println("Task 2");
-    if (xQueueReceive(queue1,&delay_updated,0)==true){
+    if (xQueueReceive(delay_queue, &delay_updated, 0)==pdTRUE){
       delay_ = delay_updated;
+      Serial.println(delay_);
+      blink = 0;
     }
     digitalWrite(2, HIGH);
     vTaskDelay(delay_/portTICK_PERIOD_MS);
     digitalWrite(2, LOW);
     vTaskDelay(delay_/portTICK_PERIOD_MS); 
     blink ++;
-    //Serial.println(blink);
 
     if(blink == 10){
-      xQueueSend(queue2,&message, 0);
-      //Serial.println("Here");
-      blink = 1;
+      char message[] = "Great Run!!";  
+      if ((xQueueSend(message_queue, message, 0)) != pdTRUE){
+        Serial.println("Message Queue Full..");
+      };
+      blink = 0;
     }    
-    //vTaskDelay(10/portTICK_PERIOD_MS);
   }
 }
 
@@ -145,10 +137,9 @@ void setup() {
 
   Serial.begin(9600);
   vTaskDelay(500/portTICK_PERIOD_MS);
-  //Serial.println("Setup Task");
 
-  queue1 = xQueueCreate(length_queue1, 3*sizeof(int));
-  queue2 = xQueueCreate(length_queue2, 15*(sizeof(char)));
+  delay_queue = xQueueCreate(length_delay_queue, 3*sizeof(int));
+  message_queue = xQueueCreate(length_message_queue, 25*(sizeof(char)));
 
   pinMode(2, OUTPUT);
 
@@ -161,8 +152,6 @@ void setup() {
     &hUserInterface,
     app_cpu
   );
-  //Serial.println("Task 1 created.");
-
 
   xTaskCreatePinnedToCore(
     ledInterface,
@@ -173,7 +162,6 @@ void setup() {
     &hLedInterface,
     app_cpu
   );
-  //Serial.println("Task 2 created.");
 }
 
 void loop() {
