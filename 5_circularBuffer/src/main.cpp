@@ -107,6 +107,13 @@ void setup() {
   }
 
 
+  //Verification that all the producers are created.
+  for (counter=0; counter < nProducers; counter ++){
+    xSemaphoreTake(sem_buffer, portMAX_DELAY);
+  }
+  Serial.println("All producers tasks created successfully.");
+
+
 
   //Creation of consumer tasks.
   for (counter=0; counter < nConsumers; counter++){
