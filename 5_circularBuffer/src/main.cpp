@@ -26,11 +26,11 @@ static TaskHandle_t hConsumer   = NULL;
 static TaskHandle_t hProducer   = NULL;
 
 
-const uint8_t nproducers = 5;
-const uint8_t nconsumers = 3;
+const uint8_t nProducers = 5;
+const uint8_t nConsumers = 3;
+const uint8_t nWrite     = 3;
 
 uint8_t counter;
-
 
 
 static SemaphoreHandle_t sem_buffer;
@@ -38,27 +38,41 @@ static SemaphoreHandle_t sem_buffer;
 static SemaphoreHandle_t mut_buffer_atomic;
 
 
+//The circular buffer has two indexes:
+//Head: The position from where the data is read.
+//Tail: The position where the data is added.
+uint8_t circular_buffer[BUFFER_SIZE] = {0};
+uint8_t head;
+uint8_t tail;
 
-uint8_t circular_buffer[BUFFER_SIZE];
-
-
-
-//This is the function called by the prdoucer tasks.
+//This is the function called by the producer tasks.
 void producer_task (void *parameters){
 
   //cast the void pointer into integer pointer and dereference it.
-  int task_number = *(int *)parameters;
+  int task_number = *((int *)parameters);
   xSemaphoreGive(sem_buffer);
+
+  //Write logic to add data to the buffer.
+  while (true){
+
+  }
   
 }
 
 
-//This is the function called by the comsumer tasks.
+//This is the function called by the consumer tasks.
 void consumer_task (void *parameters){
+
+  //Write the consumer logic.
+  while (true){
+
+  }
 
 }
 
-
+void check(void){
+  Serial.println("Check pass.");
+}
 
 void setup() {
 
@@ -66,10 +80,10 @@ void setup() {
   vTaskDelay(1000/portTICK_PERIOD_MS);
   Serial.println("Welcome to the circular buffer.");
 
-  //Creation of the semaphores and mutex locks.
-  sem_buffer = xSemaphoreCreateCounting(nproducers, 0);
-  mut_buffer_atomic = xSemaphoreCreateMutex();
 
+  //Creation of the semaphores and mutex locks.
+  sem_buffer = xSemaphoreCreateCounting(nProducers, 0);
+  mut_buffer_atomic = xSemaphoreCreateMutex();
 
 
 
@@ -84,30 +98,24 @@ void setup() {
 
 
   //Creation of producer tasks.
-  for (counter=0; counter < nproducers; counter++){
+  for (counter=0; counter < nProducers; counter++){
     sprintf(producer_task_name, "Producer task %d", counter);
 
     xTaskCreatePinnedToCore(
-      producer_task, producer_task_name, 1024, (void *)&counter, 1, NULL, app_cpu
+      producer_task, producer_task_name, 1024, (void *)&counter, 1, &hProducer, app_cpu
     );
   }
 
 
 
   //Creation of consumer tasks.
-  for (counter=0; counter < nconsumers; counter++){
+  for (counter=0; counter < nConsumers; counter++){
     sprintf(consumer_task_name, "Consumer task %d", counter);
 
     xTaskCreatePinnedToCore(
-      consumer_task, consumer_task_name, 1024, (void *)&counter, 1, NULL, app_cpu
+      consumer_task, consumer_task_name, 1024, (void *)&counter, 1, &hConsumer, app_cpu
     );
   }
-
-
-
-
-
-
 }
 
 void loop() {
