@@ -31,8 +31,7 @@ const uint8_t nProducers = 5;
 const uint8_t nConsumers = 3;
 const uint8_t nWrite = 3;
 
-void check(void)
-{
+void check(void){
   Serial.println("Check pass.");
 }
 
@@ -57,33 +56,29 @@ uint8_t read_index = 0;
 uint8_t task_counter;
 
 // This is the function called by the producer tasks.
-void producer_task(void *parameters)
-{
-
+void producer_task(void *parameters){
   uint8_t counter;
   // cast the void pointer into integer pointer and dereference it.
   uint8_t task_number = *((uint8_t *)parameters);
   // Serial.println(task_number);
   xSemaphoreGive(sem_tasks);
 
-  while (1)
-  {
+  while (1){
     /*
         First, the mutex should be taken so that the process of writing to the buffer is atomic.
         When the task is allowed to write to the buffer, it should wait for semaphore to make sure
           that memory locations are not overwritten.
 
     */
-    for (counter = 0; counter < nWrite; counter++)
-    {
+    for (counter = 0; counter < nWrite; counter++){
       xSemaphoreTake(sem_write_buffer, portMAX_DELAY);
-      if ((xSemaphoreTake(mut_buffer_atomic, portMAX_DELAY)) == pdPASS)
-      {
+      if ((xSemaphoreTake(mut_buffer_atomic, portMAX_DELAY)) == pdPASS){
         circular_buffer[write_index] = task_number;
+        // Serial.println(circular_buffer[write_index]);
         write_index = (write_index + 1) % BUFFER_SIZE;
         xSemaphoreGive(mut_buffer_atomic);
       }
-      xSemaphoreGive(sem_write_buffer);
+      // xSemaphoreGive(sem_write_buffer);
       xSemaphoreGive(sem_read_buffer);
     }
     vTaskDelete(NULL);
@@ -91,10 +86,8 @@ void producer_task(void *parameters)
 }
 
 // This is the function called by the consumer tasks.
-void consumer_task(void *parameters)
-{
-  while (1)
-  {
+void consumer_task(void *parameters){
+  while (1){
     xSemaphoreTake(sem_read_buffer, portMAX_DELAY);
     xSemaphoreTake(mut_buffer_atomic, portMAX_DELAY);
 
@@ -102,11 +95,11 @@ void consumer_task(void *parameters)
     read_index = (read_index + 1) % BUFFER_SIZE;
 
     xSemaphoreGive(mut_buffer_atomic);
+    xSemaphoreGive(sem_write_buffer);
   }
 }
 
-void setup()
-{
+void setup(){
   uint8_t counter;
   Serial.begin(115200);
   ;
@@ -114,18 +107,16 @@ void setup()
   Serial.println("Welcome to the circular buffer.");
 
   // Creation of the semaphores and mutex locks.
-  sem_write_buffer = xSemaphoreCreateCounting(nProducers, nProducers);
-  sem_read_buffer = xSemaphoreCreateCounting(nConsumers, 0);
+  sem_write_buffer = xSemaphoreCreateCounting(BUFFER_SIZE, BUFFER_SIZE);
+  sem_read_buffer = xSemaphoreCreateCounting(BUFFER_SIZE, 0);
   sem_tasks = xSemaphoreCreateCounting(nProducers, 0);
   mut_buffer_atomic = xSemaphoreCreateMutex();
 
   // Errors in case the semaphore and mutex couldn't be created.
-  if (sem_write_buffer == NULL)
-  {
+  if (sem_write_buffer == NULL){
     Serial.println("Semaphore creation failed: returned NULL.");
   }
-  if (mut_buffer_atomic == NULL)
-  {
+  if (mut_buffer_atomic == NULL){
     Serial.println("Mutex creation failed: returned NULL.");
   }
 
@@ -133,37 +124,26 @@ void setup()
   char consumer_task_name[20];
 
   // Creation of producer tasks.
-  for (task_counter = 0; task_counter < nProducers; task_counter++)
-  {
+  for (task_counter = 0; task_counter < nProducers; task_counter++){
     sprintf(producer_task_name, "Producer task %d", task_counter);
     // Serial.println(task_counter);
 
     xTaskCreatePinnedToCore(
-        producer_task, producer_task_name, 2048, (void *)&task_counter, 1, NULL, app_cpu);
-            xSemaphoreTake(sem_tasks, portMAX_DELAY);
-  }
-
-  // Verification that all the producers are created.
-  for (counter = 0; counter < nProducers; counter++)
-  {
-
+        producer_task, producer_task_name, 2048, (void *)&task_counter, 1, NULL, app_cpu
+        );
+        xSemaphoreTake(sem_tasks, portMAX_DELAY);
   }
   Serial.println("All producers tasks created successfully.");
 
   // Creation of consumer tasks.
-  for (counter = 0; counter < nConsumers; counter++)
-  {
+  for (counter = 0; counter < nConsumers; counter++){
     sprintf(consumer_task_name, "Consumer task %d", counter);
     xTaskCreatePinnedToCore(
-        consumer_task, consumer_task_name, 2048, NULL, 1, NULL, app_cpu);
+        consumer_task, consumer_task_name, 2048, NULL, 1, NULL, app_cpu
+        );
   }
-
-  // for (counter = 0; counter < (nProducers*nConsumers); counter++){
-  //   xSemaphoreTake(sem_read_buffer, portMAX_DELAY);
-  // }
 }
 
-void loop()
-{
+void loop(){
   // check();
 }
