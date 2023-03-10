@@ -17,9 +17,6 @@ static const BaseType_t app_cpu = 1;
 static TaskHandle_t hConsumer = NULL;
 // static TaskHandle_t hProducer   = NULL;
 
-const uint8_t nProducers = 5;
-const uint8_t nConsumers = 3;
-const uint8_t nWrite = 3;
 
 void check(void){
   Serial.println("Check pass.");
