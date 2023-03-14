@@ -7,6 +7,7 @@
 
 #include <Arduino.h>
 #define BUILTIN_LED 2
+#define DELAY_IN_MS 2000
 
 #if CONFIG_FREERTOS_UNICORE
 static const BaseType_t app_cpu = 0;
@@ -25,13 +26,15 @@ void check(void){
 
 // This is the function called to print in the console.
 void taskConsole(void *parameters){
+  char c;
   while(1){
     if (Serial.available() == 0){
-      xTimerReset(tihTimer, 0);
     }
     else{
+      c = Serial.read();
+      Serial.print(c);
       digitalWrite(BUILTIN_LED, HIGH);
-      Serial.print(Serial.read());
+      xTimerReset(tihTimer, portMAX_DELAY);
     }
   }
 }
@@ -43,22 +46,21 @@ void taskConsole(void *parameters){
 void callbackTimer( TimerHandle_t xTimer){
   //Task to perform when the timer expires.
   digitalWrite(BUILTIN_LED, LOW);
-
 }
 
 void setup(){
   pinMode(BUILTIN_LED, OUTPUT);
   Serial.begin(115200);
   vTaskDelay(1000 / portTICK_PERIOD_MS);
-  Serial.println("This is your serial console. The characters will be displayed here as you type.");
+  Serial.println("======This is your serial console.======");
 
   xTaskCreatePinnedToCore(taskConsole, "Console task", 1024, NULL, 1, NULL, app_cpu);
-  tihTimer = xTimerCreate("LED Timer", 2000 / portTICK_PERIOD_MS, 1, NULL, callbackTimer);
+  tihTimer = xTimerCreate("LED Timer",DELAY_IN_MS/portTICK_PERIOD_MS, 0, NULL, callbackTimer);
 
   //Verify that the timer is created.
   if (NULL == tihTimer){
-    Serial.println("The timer couln't be created.");
-    Serial.println("Continuiing without the timer.");
+    Serial.println("The timer couldn't be created.");
+    Serial.println("Continuing without the timer.");
   }
 
   vTaskDelete(NULL);
